@@ -93,4 +93,4 @@ async def status_update():
 
 bot.loop.create_task(status_update())    
 
-bot.run("ODUxNDQyNjAwOTc1OTI1Mjc5.YL4Vtw.L3vziRHCVMkLabO-uioHKPllfxI")
+bot.run("[insert token here]")
