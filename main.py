@@ -5,9 +5,36 @@ import time
 import asyncio
 import datetime
 
-ip = "voxany.net"
+try:
+    config_load = open("config.txt","r")
+    ip,port = config_load.read().split()
+    config_load.close()
+    
+except:
+    ip = "example.com"
+    port = 25565
 
-print(f"Listening on {ip}")
+ip_set = input(f"({ip}) Enter IP: ")
+
+port_set = input(f"({port}) Enter port: ")
+
+if ip_set == "":
+    pass
+else:
+    ip = ip_set
+
+if port_set == "":
+    pass
+else:
+    port = port_set
+    
+config_save = open("config.txt","w")
+
+config_save.write(f"{ip} {port}")
+
+config_save.close()
+
+print(f"Listening on {ip} {port}")
 
 mc_server = MinecraftServer(ip, 25565)
 
@@ -18,6 +45,7 @@ async def on_ready():
     await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="Loading Stats..."))
     print("Started")
 
+# Returns a list of players with their time played in the current session
 @bot.command()
 async def status(ctx):
     mc_status = mc_server.status()
@@ -93,4 +121,4 @@ async def status_update():
 
 bot.loop.create_task(status_update())    
 
-bot.run("[insert token here]")
+bot.run("[insert token]")
