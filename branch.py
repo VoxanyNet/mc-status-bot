@@ -11,30 +11,6 @@ import atexit
 class Stats:
     def __init__(self):
         self.online = True
-        self.last_seen = time.time()
-        self.join_time = time.time()
-
-class Instance:
-    def __init__(self,ip,port,rcon_pass):
-        self.ip = ip
-        self.port = int(port)
-        self.rcon_pass = rcon_pass
-        self.players_online = []
-        
-        self.players_stats = {}
-            
-        self.boot()
-        
-    def boot(self):
-        self.mc_server = MinecraftServer(self.ip, self.port)
-        
-        if self.rcon_pass != None:
-            print("RCON password was supplied!")
-            self.mcr = MCRcon(self.ip,self.rcon_pass)
-            self.mcr.connect()
-        
-
-
 bot = commands.Bot(command_prefix = "!")
 
 # Reloads instances in memory
@@ -287,4 +263,4 @@ bot.loop.create_task(status_update())
 
 atexit.register(save_instances)
 
-bot.run("ODUxNDQyNjAwOTc1OTI1Mjc5.YL4Vtw.3f36VnQClRRDE3tc1fTclx0Pzt0")
+bot.run("put token here")
