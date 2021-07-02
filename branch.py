@@ -343,4 +343,4 @@ bot.loop.create_task(status_update())
 
 atexit.register(save_instances)
 
-bot.run("ODUxNDQyNjAwOTc1OTI1Mjc5.YL4Vtw._1RKFOa7Xx9lSyrsnICyahMO8Lk")
+bot.run("i promise discord i will not forget to remove my token before pushing to gitgub")
