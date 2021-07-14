@@ -9,26 +9,50 @@ import pickle
 import atexit
 
 # Generic Functions
-def time_convert(delta):
+async def time_convert(delta):
+    convert = float(delta)
+    day = convert // (24 * 3600)
+    convert = convert % (24 * 3600)
+    hour = convert // 3600
+    convert %= 3600
+    minute = convert // 60
+    convert %= 60
+    second = convert
+    
+    
     buffer = ""
-    for key,section in enumerate(str(datetime.timedelta(seconds=int(delta))).split(":")):
-        if key == 0 and int(section) == 1:
-            buffer += f"{int(section)} hour, "
-        elif key == 0 and int(section) > 1:
-            buffer += f"{int(section)} hours, "
+    
+    # Days
+    if day == 1:
+        buffer += f"{int(day)} day, "
+    
+    elif day > 1:
+        buffer += f"{int(day)} days, "
+    
+    # Hours
+    if hour == 1:
+        buffer += f"{int(hour)} hour, "
         
-        if key == 1 and int(section) == 1:
-            buffer += f"{int(section)} minute and "
-        elif key == 1 and int(section) > 1:
-            buffer += f"{int(section)} minutes and "
-        
-        if key == 2 and int(section) == 1:
-            buffer += f"{int(section)} second"
-        elif key == 2 and int(section) > 1:
-            buffer += f"{int(section)} seconds"
+    elif hour > 1:
+        buffer += f"{int(hour)} hours, "
+    
+    # Minutes
+    if minute == 1:
+        buffer += f"{int(minute)} minute, "
+    
+    elif minute > 1:
+        buffer += f"{int(minute)} minutes, "
+    
+    # Seconds
+    if second == 1:
+        buffer += f"{int(second)} second"
+    
+    elif second > 1:
+        buffer += f"{int(second)} seconds"
+    
     return buffer
 
-def get_players_online(instance):
+async def get_players_online(instance):
     online = []
     try:
         for player in instance.mc_status.players.sample:
@@ -50,7 +74,8 @@ def save_instances():
     instances_save.close()
     print("Saved instances!")
 
-async def shutdown_instance(instance,guild_id):
+
+def shutdown_instance(instance,guild_id):
     # Sets instances status to offline
     instance.online = False
     
@@ -59,24 +84,18 @@ async def shutdown_instance(instance,guild_id):
     
     instance.mcr = None
     
-    instance_guild = bot.get_guild(guild_id)
-    
-    await instance_guild.get_member(bot.user.id).edit(nick="Server Offline")
+    instance_guild = bot.get_guild(guild_id)    
+    # await instance_guild.get_member(bot.user.id).edit(nick="Server Offline")
             
     print(f"Set {guild_id}'s server to offline")
 
-def get_instance(guild_id):
+async def get_instance(guild_id):
     try:
         instance = bot.instances[guild_id]
+        return instance
 
     except:
-        raise Exception("Unable to find server instance")
-    
-    if instance.online == True:
-        return instance
-    
-    else:
-        raise Exception("Server is offline")
+        raise Exception("No Instance")
         
 class Instance:
     def __init__(self,ip,port,rcon_pass):
@@ -91,6 +110,8 @@ class Instance:
         
     def boot(self,guild_id):
         print(f"Booting {guild_id}")
+        
+        # Tries to make rcon connection with server
         if self.rcon_pass != None:
             try:
                 self.mcr = MCRcon(self.ip, self.rcon_pass)
@@ -103,10 +124,13 @@ class Instance:
         try:
             # Attempts to make connection to server
             self.mc_server = MinecraftServer(self.ip, self.port)
+            self.mc_server.status()
             self.online = True
         except:
             # Commits suduko
             shutdown_instance(self,guild_id)
+            
+            #raise Exception("Server Offline")
         
 class Stats:
     def __init__(self):
@@ -131,8 +155,10 @@ except:
 # Boots all instances
 for guild_id, instance in bot.instances.items():
     instance.boot(guild_id)
-
+    
 bot.help_messages = {
+    "setserver": "**!setserver [server-ip] [server-port] [rcon-password]** - Sets which server should be monitored. Specifying an RCON password is optional, use !rcon for more info.",
+    "reconnect": "**!reconnect** - Reconnects to the previously set server.",
     "status": "**!status [player]** - Lists all online players with their session playtimes",
     "lastseen": "**!lastseen [player]** - Displays time elapsed since player's last log-off",
     "whitelist": "**!whitelist [player]** - Adds specified player to the whitelist"
@@ -140,7 +166,7 @@ bot.help_messages = {
 
 @bot.event
 async def on_ready():
-    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name="Loading Stats..."))
+    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.listening, name="!mchelp"))
     print("Started")
 
 @bot.command()
@@ -149,8 +175,9 @@ async def contextual(ctx):
 
 # Creates a new server instance    
 @bot.command()
-async def connect(ctx,ip,port,password = None):
+async def setserver(ctx,ip,port,password = None):
 
+    print(f"Creating server with password: {str(password)}")
     # Creates server instance
     new_instance = Instance(ip,port,password)
     
@@ -165,9 +192,15 @@ async def connect(ctx,ip,port,password = None):
 # Reconnects existing server instance
 @bot.command()
 async def reconnect(ctx):
-    instance = bot.instances[ctx.message.guild.id]
+    try:
+        instance = await get_instance(ctx.message.guild.id)
+    except:
+        await ctx.send("Could not find existing server! Use **!setserver** to set one up.")
+        return
     
     instance.boot(ctx.message.guild.id)
+    
+    await ctx.send("Attempting reconnection!")
     
 @bot.command()
 async def mchelp(ctx,command = None):
@@ -178,19 +211,35 @@ async def mchelp(ctx,command = None):
         await ctx.send(buffer)
     else:
         await ctx.send(bot.help_messages[command])
+
+@bot.command()
+async def rcon(ctx):
+
+    instance = await get_instance(ctx.message.guild.id)
+    
+    if instance.rcon_pass != None:
+        await ctx.send("RCON has been **successfully** configured.\n")
+    else:
+        await ctx.send("RCON has **failed** to configure.\n")
+
+    await ctx.send("RCON is required to send commands to your server. Here is a tutorial on how to set it up:\nhttps://youtu.be/oTjp3kWTjjs")
    
 
 @bot.command()
 async def kick(ctx,user):
     # Loads instance
     try:
-        instance = get_instance(ctx.message.guild.id)
+        instance = await get_instance(ctx.message.guild.id)
     except:
-        await ctx.send("Could not connect to your server.")
+        await ctx.send("Could not find existing server! Use **!setserver** to set one up.")
+        return
+        
+    if instance.online == False:
+        await ctx.send("Server is offline.")
         return
     
     if instance.rcon_pass == None:
-        await ctx.send("You must supply an RCON password for this command to work!\nType !rcon for more info.")
+        await ctx.send("You must supply an **RCON password** for this command to work!\nType **!rcon** for more info.")
         return
         
     roles = []
@@ -207,13 +256,17 @@ async def kick(ctx,user):
 @bot.command()
 async def whitelist(ctx,user):     
     try:
-        instance = get_instance(ctx.message.guild.id)
+        instance = await get_instance(ctx.message.guild.id)
     except:
-        await ctx.send("Could not connect to your server.")
+        await ctx.send("Could not find existing server! Use **!setserver** to set one up.")
+        return
+        
+    if instance.online == False:
+        await ctx.send("Server is offline.")
         return
     
     if instance.rcon_pass == None:
-            await ctx.send("You must supply an RCON password for this command to work!\nType !rcon for more info.")
+            await ctx.send("You must supply an **RCON password** for this command to work!\nType **!rcon** for more info.")
             return
             
     roles = []
@@ -231,9 +284,13 @@ async def whitelist(ctx,user):
 @bot.command()
 async def status(ctx):
     try:
-        instance = get_instance(ctx.message.guild.id)
+        instance = await get_instance(ctx.message.guild.id)
     except:
-        await ctx.send("Could not connect to your server.")
+        await ctx.send("Could not find existing server! Use **!setserver** to set one up.")
+        return
+        
+    if instance.online == False:
+        await ctx.send("Server is offline.")
         return
         
     instance.mc_status = instance.mc_server.status()
@@ -259,9 +316,13 @@ async def status(ctx):
 @bot.command()
 async def lastseen(ctx,user):
     try:
-        instance = get_instance(ctx.message.guild.id)
+        instance = await get_instance(ctx.message.guild.id)
     except:
-        await ctx.send("Could not connect to your server.")
+        await ctx.send("Could not find existing server! Use **!setserver** to set one up.")
+        return
+        
+    if instance.online == False:
+        await ctx.send("Server is offline.")
         return
     
     # We first check if the player is online
@@ -271,7 +332,7 @@ async def lastseen(ctx,user):
     if user in instance.players_online:
         await ctx.send(f"{user} is currently online!")
     else:
-        await ctx.send(f"**{user}** was last seen **{time_convert(time.time() - instance.players_stats[user].last_seen)}** ago")
+        await ctx.send(f"**{user}** was last seen **{await time_convert(time.time() - instance.players_stats[user].last_seen)}** ago")
 
 # Main loop of bot
 async def status_update():
@@ -286,7 +347,6 @@ async def status_update():
                 # First checks to see if server is offline
                 if instance.online == False:
                     # If the server is offline we move onto the next instance
-                    print(f"{guild_id}'s instance is offline.")
                     continue
                 instance.players_online = []
             #print("Clearing list of online players!")
@@ -297,7 +357,7 @@ async def status_update():
             
             # Creates a list of players online
             #print("Getting list of players online!")
-                instance.players_online = get_players_online(instance)
+                instance.players_online = await get_players_online(instance)
             
                 # Checks if each player online is in the player stats dictionary
                 for player in instance.players_online:
@@ -333,9 +393,14 @@ async def status_update():
                 
                 await instance_guild.get_member(bot.user.id).edit(nick=status_message)
         except:
-            print(f"Setting {guild_id}'s status to offline.")
             
-            await shutdown_instance(instance,guild_id)
+            instance_guild = bot.get_guild(guild_id)
+            
+            await instance_guild.text_channels[0].send("Your server went offline! Type **!reconnect** once its back online.")
+            
+            await instance_guild.get_member(bot.user.id).edit(nick="Server Offline")            
+    
+            shutdown_instance(instance,guild_id)
             
         await asyncio.sleep(10)
         
@@ -343,4 +408,4 @@ bot.loop.create_task(status_update())
 
 atexit.register(save_instances)
 
-bot.run("i promise discord i will not forget to remove my token before pushing to gitgub")
+bot.run("insert token")
